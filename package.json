@@ -24,6 +24,6 @@
   "homepage": "https://github.com/yyx990803/register-service-worker#readme",
   "devDependencies": {
     "buble": "^0.18.0",
-    "conventional-changelog-cli": "^2.0.1"
+    "conventional-changelog-cli": "^2.0.0"
   }
 }

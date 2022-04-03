@@ -5,6 +5,21 @@
 // will only see deployed updates on the "N+1" visit to a page, since previously
 // cached resources are updated in the background.
 
+type Hooks = {
+  registrationOptions?: RegistrationOptions;
+  ready?: (registration: ServiceWorkerRegistration) => void;
+  registered?: (registration: ServiceWorkerRegistration) => void;
+  cached?: (registration: ServiceWorkerRegistration) => void;
+  updated?: (registration: ServiceWorkerRegistration) => void;
+  updatefound?: (registration: ServiceWorkerRegistration) => void;
+  offline?: () => void;
+  error?: (error: Error) => void;
+};
+
+type HookKeys = Exclude<keyof Hooks, 'registrationOptions'>
+
+type Emit = (event: HookKeys, value?: Error | ServiceWorkerRegistration) => void
+
 const isLocalhost = () => Boolean(
   window.location.hostname === 'localhost' ||
     // [::1] is the IPv6 localhost address.
@@ -15,9 +30,9 @@ const isLocalhost = () => Boolean(
     )
 )
 
-let emit = console.error
+let emit: Emit = console.error
 
-let waitWindowLoad
+let waitWindowLoad: PromiseLike<any>
 // https://github.com/yyx990803/register-service-worker/pull/33#discussion_r394181861
 if (typeof window !== 'undefined') {
   // Typically, a browser that supports `serviceWorker` should also have supported
@@ -27,17 +42,18 @@ if (typeof window !== 'undefined') {
   if (typeof Promise !== 'undefined') {
     waitWindowLoad = new Promise(resolve => window.addEventListener('load', resolve))
   } else {
-    waitWindowLoad = { then: (cb) => window.addEventListener('load', cb) }
+    waitWindowLoad = { then: (cb: any) => window.addEventListener('load', cb) } as PromiseLike<any>
   }
 }
 
-export function register (swUrl, hooks = {}) {
+export function register (swUrl: string, hooks: Hooks = {}) {
   const { registrationOptions = {}} = hooks
   delete hooks.registrationOptions
 
-  emit = (hook, ...args) => {
+  emit = (hook: HookKeys, value?: Error | ServiceWorkerRegistration) => {
     if (hooks && hooks[hook]) {
-      hooks[hook](...args)
+      // TODO: remove any
+      hooks[hook]?.(value as any)
     }
   }
 
@@ -60,14 +76,18 @@ export function register (swUrl, hooks = {}) {
   }
 }
 
-function handleError (emit, error) {
+function isJavaScriptContentType (headers: Headers) {
+  return headers.get('content-type')?.toLowerCase()?.includes('javascript')
+}
+
+function handleError (emit: Emit, error: Error) {
   if (!navigator.onLine) {
     emit('offline')
   }
   emit('error', error)
 }
 
-function registerValidSW (swUrl, emit, registrationOptions) {
+function registerValidSW (swUrl: string, emit: Emit, registrationOptions: RegistrationOptions) {
   navigator.serviceWorker
     .register(swUrl, registrationOptions)
     .then(registration => {
@@ -79,6 +99,10 @@ function registerValidSW (swUrl, emit, registrationOptions) {
       registration.onupdatefound = () => {
         emit('updatefound', registration)
         const installingWorker = registration.installing
+        if (!installingWorker) {
+          // TODO: emit a state
+          return
+        }
         installingWorker.onstatechange = () => {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
@@ -100,7 +124,7 @@ function registerValidSW (swUrl, emit, registrationOptions) {
     .catch(error => handleError(emit, error))
 }
 
-function checkValidServiceWorker (swUrl, emit, registrationOptions) {
+function checkValidServiceWorker (swUrl: string, emit: Emit, registrationOptions: RegistrationOptions) {
   // Check if the service worker can be found.
   fetch(swUrl, {cache: "no-store"})
     .then(response => {
@@ -109,7 +133,7 @@ function checkValidServiceWorker (swUrl, emit, registrationOptions) {
         // No service worker found.
         emit('error', new Error(`Service worker not found at ${swUrl}`))
         unregister()
-      } else if (response.headers.get('content-type').indexOf('javascript') === -1) {
+      } else if (!isJavaScriptContentType(response.headers)) {
         emit('error', new Error(
           `Expected ${swUrl} to have javascript content-type, ` +
           `but received ${response.headers.get('content-type')}`))

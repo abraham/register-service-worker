@@ -2,12 +2,20 @@
 
 A script to simplify service worker registration with hooks for common events.
 
+**Note:** This is a fork of [yyx990803/register-service-worker](https://github.com/yyx990803/register-service-worker)
+
+## Install
+
+```sh
+npm install @abraham/register-service-worker
+```
+
 ## Usage
 
 **Note:** this script uses ES modules export and is expected to be used with a client side bundler that can handle ES modules syntax.
 
 ``` js
-import { register } from 'register-service-worker'
+import { register } from '@abraham/register-service-worker'
 
 register('/service-worker.js', {
   registrationOptions: { scope: './' },
